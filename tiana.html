@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Tesla Dashboard</title>
+<style>
+  :root {
+    --bg: #0a0a0a;
+    --card: #141414;
+    --card2: #1a1a1a;
+    --border: #2a2a2a;
+    --red: #e31937;
+    --red2: #ff2d4e;
+    --text: #f0f0f0;
+    --muted: #888;
+    --green: #00c853;
+    --blue: #2196f3;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+  /* AUTH SCREEN */
+  #auth-screen {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; padding: 2rem; gap: 2rem;
+  }
+  .tesla-logo { width: 60px; fill: var(--red); }
+  .auth-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    padding: 2.5rem; width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 1.5rem;
+  }
+  .auth-card h2 { font-size: 1.4rem; font-weight: 600; }
+  .auth-card p { color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+  .field-group { display: flex; flex-direction: column; gap: 0.4rem; }
+  .field-group label { font-size: 0.8rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .field-group input {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 0.65rem 0.9rem; color: var(--text); font-size: 0.95rem; width: 100%;
+    transition: border-color 0.2s;
+  }
+  .field-group input:focus { outline: none; border-color: var(--red); }
+  .btn {
+    background: var(--red); color: #fff; border: none; border-radius: 8px;
+    padding: 0.75rem 1.5rem; font-size: 1rem; font-weight: 600; cursor: pointer;
+    transition: background 0.2s, transform 0.1s; width: 100%;
+  }
+  .btn:hover { background: var(--red2); }
+  .btn:active { transform: scale(0.98); }
+  .btn:disabled { background: #444; cursor: not-allowed; }
+  .hint { font-size: 0.78rem; color: var(--muted); }
+  .hint a { color: var(--red); text-decoration: none; }
+
+  /* DASHBOARD */
+  #dashboard { display: none; padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+  .top-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);
+  }
+  .top-bar-left { display: flex; align-items: center; gap: 1rem; }
+  .top-bar svg { width: 36px; fill: var(--red); }
+  .vehicle-name { font-size: 1.3rem; font-weight: 700; }
+  .vehicle-sub { font-size: 0.8rem; color: var(--muted); }
+  .btn-sm {
+    background: transparent; border: 1px solid var(--border); color: var(--muted);
+    border-radius: 6px; padding: 0.4rem 0.9rem; font-size: 0.82rem; cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-sm:hover { border-color: var(--red); color: var(--text); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.2rem; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 1.5rem; position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, var(--red), transparent);
+  }
+  .card-title { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1.2rem; }
+  
+  /* Battery gauge */
+  .gauge-wrap { display: flex; align-items: center; gap: 1.5rem; }
+  .gauge { position: relative; width: 110px; height: 110px; flex-shrink: 0; }
+  .gauge svg { transform: rotate(-90deg); }
+  .gauge-bg { fill: none; stroke: var(--border); stroke-width: 10; }
+  .gauge-fill { fill: none; stroke-width: 10; stroke-linecap: round; transition: stroke-dashoffset 1s ease; }
+  .gauge-text {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center;
+  }
+  .gauge-pct { font-size: 1.6rem; font-weight: 700; line-height: 1; }
+  .gauge-label { font-size: 0.65rem; color: var(--muted); }
+  .gauge-info { display: flex; flex-direction: column; gap: 0.6rem; }
+  .stat-row { display: flex; flex-direction: column; }
+  .stat-val { font-size: 1.1rem; font-weight: 600; }
+  .stat-key { font-size: 0.72rem; color: var(--muted); }
+
+  /* Charging */
+  .charge-state { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1rem; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot.charging { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 1.5s infinite; }
+  .dot.stopped { background: var(--muted); }
+  .dot.complete { background: var(--green); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .charge-label { font-size: 1rem; font-weight: 600; }
+  .charge-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+  .charge-item { background: var(--card2); border-radius: 8px; padding: 0.7rem; }
+  .charge-item .val { font-size: 1rem; font-weight: 600; }
+  .charge-item .key { font-size: 0.7rem; color: var(--muted); }
+
+  /* Climate */
+  .climate-main { display: flex; align-items: flex-end; gap: 0.5rem; margin-bottom: 1rem; }
+  .climate-temp { font-size: 3rem; font-weight: 700; line-height: 1; }
+  .climate-unit { font-size: 1rem; color: var(--muted); padding-bottom: 0.5rem; }
+  .climate-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+  .climate-item { background: var(--card2); border-radius: 8px; padding: 0.7rem; }
+
+  /* Map */
+  #map-placeholder {
+    background: var(--card2); border-radius: 10px; height: 200px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: var(--muted); font-size: 0.9rem; gap: 0.5rem; border: 1px dashed var(--border);
+  }
+  .map-pin { font-size: 2rem; }
+  .map-coords { font-size: 0.75rem; font-family: monospace; color: var(--red); margin-top: 0.3rem; }
+  iframe#map-frame { width: 100%; height: 200px; border: none; border-radius: 10px; }
+
+  /* Loading */
+  .loading { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 1rem; }
+  .spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--red); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-banner {
+    background: #2a0a0a; border: 1px solid #5a1a1a; color: #ff8a80;
+    border-radius: 8px; padding: 0.8rem 1rem; font-size: 0.85rem; margin-bottom: 1rem;
+  }
+  .refresh-time { font-size: 0.72rem; color: var(--muted); }
+  .badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+  .badge.online { background: #0a2a0a; color: var(--green); }
+  .badge.offline { background: #2a2a2a; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="auth-screen">
+  <svg class="tesla-logo" viewBox="0 0 342 512">
+    <path d="M0 57.3C48 48 112 42.7 171 42.7S294 48 342 57.3v42.7c-28-5.3-84-10.7-171-10.7S28 94.7 0 100V57.3zm171 397.4L85.3 241.3H0C14.7 366.7 85.3 460 171 469.3 256.7 460 327.3 366.7 342 241.3h-85.3L171 454.7zM0 185.3h342v-42.7H0v42.7z"/>
+  </svg>
+  <div class="auth-card">
+    <div>
+      <h2>Tesla Dashboard</h2>
+      <p>Connect your Tesla account to view live vehicle stats. Enter your developer credentials below, then sign in with Tesla.</p>
+    </div>
+    <div id="error-msg" class="error-banner" style="display:none"></div>
+    <div class="field-group">
+      <label>Client ID</label>
+      <input type="text" id="client-id" placeholder="Your Tesla app client_id"/>
+    </div>
+    <div class="field-group">
+      <label>Redirect URI</label>
+      <input type="text" id="redirect-uri" placeholder="e.g. http://localhost or this page's URL"/>
+    </div>
+    <button class="btn" onclick="startOAuth()">Sign in with Tesla →</button>
+    <button class="btn" style="background:var(--card);border:1px solid var(--border);color:var(--muted);margin-top:-0.5rem" onclick="loadMockData()">👁 Preview with mock data</button>
+    <p class="hint">
+      Don't have credentials? Register at <a href="https://developer.tesla.com" target="_blank">developer.tesla.com</a>.
+      Your <code>client_secret</code> is only needed server-side — this dashboard uses PKCE for secure login.
+    </p>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div class="loading" id="loading-screen" style="display:none">
+  <div class="spinner"></div>
+  <span style="color:var(--muted)">Connecting to Tesla…</span>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+  <div class="top-bar">
+    <div class="top-bar-left">
+      <svg viewBox="0 0 342 512"><path d="M0 57.3C48 48 112 42.7 171 42.7S294 48 342 57.3v42.7c-28-5.3-84-10.7-171-10.7S28 94.7 0 100V57.3zm171 397.4L85.3 241.3H0C14.7 366.7 85.3 460 171 469.3 256.7 460 327.3 366.7 342 241.3h-85.3L171 454.7zM0 185.3h342v-42.7H0v42.7z"/></svg>
+      <div>
+        <div class="vehicle-name" id="v-name">My Tesla</div>
+        <div class="vehicle-sub" id="v-sub">—</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:0.8rem">
+      <span class="refresh-time" id="refresh-time"></span>
+      <button class="btn-sm" onclick="refreshData()">↻ Refresh</button>
+      <button class="btn-sm" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- Battery -->
+    <div class="card">
+      <div class="card-title">🔋 Battery</div>
+      <div class="gauge-wrap">
+        <div class="gauge">
+          <svg width="110" height="110" viewBox="0 0 110 110">
+            <circle class="gauge-bg" cx="55" cy="55" r="45"/>
+            <circle class="gauge-fill" id="gauge-circle" cx="55" cy="55" r="45"
+              stroke-dasharray="283" stroke-dashoffset="283"/>
+          </svg>
+          <div class="gauge-text">
+            <div class="gauge-pct" id="batt-pct">—</div>
+            <div class="gauge-label">charge</div>
+          </div>
+        </div>
+        <div class="gauge-info">
+          <div class="stat-row">
+            <div class="stat-val" id="batt-range">—</div>
+            <div class="stat-key">Est. range (km)</div>
+          </div>
+          <div class="stat-row">
+            <div class="stat-val" id="batt-limit">—</div>
+            <div class="stat-key">Charge limit</div>
+          </div>
+          <div class="stat-row">
+            <div class="stat-val" id="batt-ideal">—</div>
+            <div class="stat-key">Ideal range (km)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charging -->
+    <div class="card">
+      <div class="card-title">⚡ Charging</div>
+      <div class="charge-state">
+        <div class="dot" id="charge-dot"></div>
+        <div class="charge-label" id="charge-label">—</div>
+      </div>
+      <div class="charge-grid">
+        <div class="charge-item"><div class="val" id="charge-power">—</div><div class="key">Power (kW)</div></div>
+        <div class="charge-item"><div class="val" id="charge-time">—</div><div class="key">Time to full</div></div>
+        <div class="charge-item"><div class="val" id="charge-added">—</div><div class="key">Energy added (kWh)</div></div>
+        <div class="charge-item"><div class="val" id="charge-volts">—</div><div class="key">Volts</div></div>
+      </div>
+    </div>
+
+    <!-- Climate -->
+    <div class="card">
+      <div class="card-title">🌡️ Climate</div>
+      <div class="climate-main">
+        <div class="climate-temp" id="clim-inside">—</div>
+        <div class="climate-unit">°C inside</div>
+      </div>
+      <div class="climate-grid">
+        <div class="climate-item"><div class="val" id="clim-outside">—°C</div><div class="key">Outside temp</div></div>
+        <div class="climate-item"><div class="val" id="clim-hvac">—</div><div class="key">HVAC</div></div>
+        <div class="climate-item"><div class="val" id="clim-driver">—</div><div class="key">Driver seat</div></div>
+        <div class="climate-item"><div class="val" id="clim-pass">—</div><div class="key">Passenger seat</div></div>
+      </div>
+    </div>
+
+    <!-- Location -->
+    <div class="card">
+      <div class="card-title">📍 Location</div>
+      <div id="map-placeholder">
+        <div class="map-pin">📍</div>
+        <div>Location will appear here</div>
+        <div class="map-coords" id="map-coords"></div>
+      </div>
+      <iframe id="map-frame" style="display:none"></iframe>
+      <div style="margin-top:0.8rem;display:flex;gap:0.8rem">
+        <div class="stat-row">
+          <div class="stat-val" id="loc-speed">—</div>
+          <div class="stat-key">Speed (km/h)</div>
+        </div>
+        <div class="stat-row">
+          <div class="stat-val" id="loc-heading">—</div>
+          <div class="stat-key">Heading</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────────────────
+const TESLA_AUTH_URL = 'https://auth.tesla.com/oauth2/v3/authorize';
+const TOKEN_URL      = 'https://auth.tesla.com/oauth2/v3/token';
+const API_BASE       = 'https://fleet-api.prd.na.vn.cloud.tesla.com/api/1';
+const SCOPES         = 'openid offline_access vehicle_device_data vehicle_location';
+
+// ── PKCE helpers ─────────────────────────────────────────────────────────────
+function b64url(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+async function genVerifier() {
+  const arr = crypto.getRandomValues(new Uint8Array(32));
+  return b64url(arr);
+}
+async function genChallenge(verifier) {
+  const enc = new TextEncoder().encode(verifier);
+  const digest = await crypto.subtle.digest('SHA-256', enc);
+  return b64url(digest);
+}
+function genState() { return b64url(crypto.getRandomValues(new Uint8Array(16))); }
+
+// ── OAuth flow ────────────────────────────────────────────────────────────────
+async function startOAuth() {
+  const clientId   = document.getElementById('client-id').value.trim();
+  const redirectUri= document.getElementById('redirect-uri').value.trim();
+  if (!clientId || !redirectUri) { showError('Please enter your Client ID and Redirect URI.'); return; }
+
+  const verifier  = await genVerifier();
+  const challenge = await genChallenge(verifier);
+  const state     = genState();
+
+  sessionStorage.setItem('pkce_verifier',  verifier);
+  sessionStorage.setItem('oauth_state',    state);
+  sessionStorage.setItem('client_id',      clientId);
+  sessionStorage.setItem('redirect_uri',   redirectUri);
+
+  const params = new URLSearchParams({
+    response_type:         'code',
+    client_id:             clientId,
+    redirect_uri:          redirectUri,
+    scope:                 SCOPES,
+    state,
+    code_challenge:        challenge,
+    code_challenge_method: 'S256',
+  });
+  window.location.href = `${TESLA_AUTH_URL}?${params}`;
+}
+
+// ── Handle callback ───────────────────────────────────────────────────────────
+async function handleCallback(code, state) {
+  const savedState  = sessionStorage.getItem('oauth_state');
+  const verifier    = sessionStorage.getItem('pkce_verifier');
+  const clientId    = sessionStorage.getItem('client_id');
+  const redirectUri = sessionStorage.getItem('redirect_uri');
+
+  if (state !== savedState) { showError('OAuth state mismatch. Please try again.'); showAuth(); return; }
+
+  show('loading-screen');
+  try {
+    const res = await fetch(TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type:    'authorization_code',
+        client_id:     clientId,
+        code,
+        redirect_uri:  redirectUri,
+        code_verifier: verifier,
+      })
+    });
+    const tok = await res.json();
+    if (!tok.access_token) throw new Error(tok.error_description || 'Token exchange failed');
+    sessionStorage.setItem('access_token',  tok.access_token);
+    sessionStorage.setItem('refresh_token', tok.refresh_token || '');
+    // Clean URL
+    window.history.replaceState({}, '', window.location.pathname);
+    await loadDashboard();
+  } catch(e) {
+    hide('loading-screen'); showAuth(); showError(e.message);
+  }
+}
+
+// ── API fetch helper ──────────────────────────────────────────────────────────
+async function apiFetch(path) {
+  const token = sessionStorage.getItem('access_token');
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
+  return res.json();
+}
+
+// ── Load dashboard ────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  show('loading-screen');
+  try {
+    const vehicles = await apiFetch('/vehicles');
+    if (!vehicles.response?.length) throw new Error('No vehicles found on this account.');
+    const v = vehicles.response[0];
+    const vid = v.id_s;
+    sessionStorage.setItem('vehicle_id', vid);
+
+    setText('v-name', v.display_name || 'My Tesla');
+    setText('v-sub', `${v.vin} · ${v.state === 'online' ? '🟢 Online' : '⚫ Asleep'}`);
+
+    await refreshData(vid);
+  } catch(e) {
+    hide('loading-screen'); showAuth(); showError(e.message);
+  }
+}
+
+async function refreshData(vid) {
+  vid = vid || sessionStorage.getItem('vehicle_id');
+  if (!vid) return;
+  show('loading-screen');
+  hide('dashboard');
+  try {
+    // Wake if needed (optional — may take ~30s, skip for speed)
+    const data = await apiFetch(`/vehicles/${vid}/vehicle_data?endpoints=charge_state%3Bdrive_state%3Bclimate_state%3Bvehicle_state`);
+    const d = data.response;
+    renderBattery(d.charge_state);
+    renderCharging(d.charge_state);
+    renderClimate(d.climate_state);
+    renderLocation(d.drive_state);
+    setText('refresh-time', `Updated ${new Date().toLocaleTimeString()}`);
+    hide('loading-screen');
+    hide('auth-screen');
+    show('dashboard');
+  } catch(e) {
+    hide('loading-screen');
+    // If vehicle is asleep, show dashboard with stale notice
+    show('dashboard');
+    showError(`Could not fetch live data: ${e.message}. Vehicle may be asleep.`);
+  }
+}
+
+// ── Renderers ─────────────────────────────────────────────────────────────────
+function renderBattery(c) {
+  const pct = c.battery_level ?? 0;
+  setText('batt-pct', pct + '%');
+  const color = pct > 50 ? '#00c853' : pct > 20 ? '#ffc107' : '#e31937';
+  const circle = document.getElementById('gauge-circle');
+  const circ = 2 * Math.PI * 45;
+  circle.style.stroke = color;
+  circle.style.strokeDashoffset = circ - (circ * pct / 100);
+
+  const toKm = mi => mi ? Math.round(mi * 1.60934) : '—';
+  setText('batt-range',  toKm(c.battery_range));
+  setText('batt-ideal',  toKm(c.ideal_battery_range));
+  setText('batt-limit',  (c.charge_limit_soc ?? '—') + '%');
+}
+
+function renderCharging(c) {
+  const state = c.charging_state || 'Unknown';
+  setText('charge-label', state);
+  const dot = document.getElementById('charge-dot');
+  dot.className = 'dot ' + (state === 'Charging' ? 'charging' : state === 'Complete' ? 'complete' : 'stopped');
+  setText('charge-power', c.charger_power != null ? c.charger_power : '—');
+  const mins = c.minutes_to_full_charge;
+  setText('charge-time', mins != null ? (mins < 60 ? `${mins}m` : `${Math.floor(mins/60)}h ${mins%60}m`) : '—');
+  setText('charge-added', c.charge_energy_added != null ? c.charge_energy_added.toFixed(1) : '—');
+  setText('charge-volts', c.charger_voltage ?? '—');
+}
+
+function renderClimate(c) {
+  setText('clim-inside',  c.inside_temp != null ? c.inside_temp.toFixed(1) : '—');
+  setText('clim-outside', c.outside_temp != null ? c.outside_temp.toFixed(1) + '°C' : '—');
+  setText('clim-hvac',    c.is_climate_on ? '✅ On' : '❌ Off');
+  const seat = lvl => lvl ? `Level ${lvl}` : 'Off';
+  setText('clim-driver',  seat(c.seat_heater_left));
+  setText('clim-pass',    seat(c.seat_heater_right));
+}
+
+function renderLocation(d) {
+  if (!d) return;
+  const lat = d.latitude, lon = d.longitude;
+  setText('loc-speed',   d.speed != null ? Math.round(d.speed * 1.60934) : '0');
+  setText('loc-heading', d.heading != null ? heading(d.heading) : '—');
+  if (lat && lon) {
+    const coordEl = document.getElementById('map-coords');
+    if (coordEl) coordEl.textContent = `${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+    const frame = document.getElementById('map-frame');
+    const placeholder = document.getElementById('map-placeholder');
+    frame.src = `https://www.openstreetmap.org/export/embed.html?bbox=${lon-0.01},${lat-0.01},${lon+0.01},${lat+0.01}&layer=mapnik&marker=${lat},${lon}`;
+    frame.style.display = 'block';
+    if (placeholder) placeholder.style.display = 'none';
+  }
+}
+
+function heading(deg) {
+  const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+  return dirs[Math.round(deg / 45) % 8];
+}
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function setText(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+function show(id) { const el = document.getElementById(id); if (el) el.style.display = id === 'dashboard' ? 'block' : 'flex'; }
+function hide(id) { const el = document.getElementById(id); if (el) el.style.display = 'none'; }
+function showAuth() { hide('loading-screen'); hide('dashboard'); show('auth-screen'); }
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+function signOut() {
+  ['access_token','refresh_token','vehicle_id','pkce_verifier','oauth_state','client_id','redirect_uri']
+    .forEach(k => sessionStorage.removeItem(k));
+  showAuth();
+}
+
+// ── Mock data ─────────────────────────────────────────────────────────────────
+function loadMockData() {
+  const mock = {
+    charge_state: {
+      battery_level: 78,
+      battery_range: 198,
+      ideal_battery_range: 211,
+      charge_limit_soc: 90,
+      charging_state: 'Charging',
+      charger_power: 11,
+      minutes_to_full_charge: 47,
+      charge_energy_added: 14.3,
+      charger_voltage: 240,
+    },
+    climate_state: {
+      inside_temp: 22.5,
+      outside_temp: 14.1,
+      is_climate_on: true,
+      seat_heater_left: 2,
+      seat_heater_right: 1,
+    },
+    drive_state: {
+      latitude: -33.8688,
+      longitude: 151.2093,
+      speed: 0,
+      heading: 45,
+    },
+  };
+
+  setText('v-name', 'Model 3 Long Range');
+  setText('v-sub', '5YJ3E1EA·MOCK · 🟢 Online  (mock data)');
+  renderBattery(mock.charge_state);
+  renderCharging(mock.charge_state);
+  renderClimate(mock.climate_state);
+  renderLocation(mock.drive_state);
+  setText('refresh-time', `Preview — ${new Date().toLocaleTimeString()}`);
+  hide('auth-screen');
+  hide('loading-screen');
+  show('dashboard');
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+(async function init() {
+  const params = new URLSearchParams(window.location.search);
+  const code   = params.get('code');
+  const state  = params.get('state');
+  const token  = sessionStorage.getItem('access_token');
+
+  if (code && state) {
+    await handleCallback(code, state);
+  } else if (token) {
+    await loadDashboard();
+  } else {
+    showAuth();
+  }
+})();
+</script>
+</body>
+</html>
